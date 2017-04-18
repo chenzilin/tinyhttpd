@@ -1,17 +1,3 @@
-/* J. David's webserver */
-/* This is a simple webserver.
- * Created November 1999 by J. David Blackstone.
- * CSE 4344 (Network concepts), Prof. Zeigler
- * University of Texas at Arlington
- */
-/* This program compiles for Sparc Solaris 2.6.
- * To compile for Linux:
- *  1) Comment out the #include <pthread.h> line.
- *  2) Comment out the line that defines the variable newthread.
- *  3) Comment out the two lines that run pthread_create().
- *  4) Uncomment the line that runs accept_request().
- *  5) Remove -lsocket from the Makefile.
- */
 #include <stdio.h>
 #include <sys/socket.h>
 #include <sys/types.h>
@@ -25,12 +11,13 @@
 #include <pthread.h>
 #include <sys/wait.h>
 #include <stdlib.h>
+#include <pthread.h>
 
 #define ISspace(x) isspace((int)(x))
 
 #define SERVER_STRING "Server: jdbhttpd/0.1.0\r\n"
 
-void accept_request(int);
+void *accept_request(void *);
 void bad_request(int);
 void cat(int, FILE *);
 void cannot_execute(int);
@@ -48,8 +35,9 @@ void unimplemented(int);
  * return.  Process the request appropriately.
  * Parameters: the socket connected to the client */
 /**********************************************************************/
-void accept_request(int client)
+void *accept_request(void * tclient)
 {
+ int client = *(int *)tclient;
  char buf[1024];
  int numchars;
  char method[255];
@@ -73,7 +61,7 @@ void accept_request(int client)
  if (strcasecmp(method, "GET") && strcasecmp(method, "POST"))
  {
   unimplemented(client);
-  return;
+  return NULL;
  }
 
  if (strcasecmp(method, "POST") == 0)
@@ -125,6 +113,7 @@ void accept_request(int client)
  }
 
  close(client);
+ return NULL;
 }
 
 /**********************************************************************/
@@ -433,7 +422,7 @@ int startup(u_short *port)
   error_die("bind");
  if (*port == 0)  /* if dynamically allocating a port */
  {
-  int namelen = sizeof(name);
+  socklen_t namelen = sizeof(name);
   if (getsockname(httpd, (struct sockaddr *)&name, &namelen) == -1)
    error_die("getsockname");
   *port = ntohs(name.sin_port);
@@ -478,7 +467,7 @@ int main(void)
  u_short port = 0;
  int client_sock = -1;
  struct sockaddr_in client_name;
- int client_name_len = sizeof(client_name);
+ socklen_t client_name_len = sizeof(client_name);
  pthread_t newthread;
 
  server_sock = startup(&port);
@@ -491,8 +480,8 @@ int main(void)
                        &client_name_len);
   if (client_sock == -1)
    error_die("accept");
- /* accept_request(client_sock); */
- if (pthread_create(&newthread , NULL, accept_request, client_sock) != 0)
+  //accept_request(client_sock);
+  if (pthread_create(&newthread , NULL, accept_request, (void *)&client_sock) != 0)
    perror("pthread_create");
  }
 
